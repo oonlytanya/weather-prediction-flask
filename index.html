@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather Prediction</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <style>
+        :root {
+            --primary: #4361ee;
+            --secondary: #3f37c9;
+        }
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            padding-bottom: 2rem;
+        }
+        .weather-card {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.1);
+            transition: transform 0.3s;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+        }
+        .weather-card:hover {
+            transform: translateY(-5px);
+        }
+        #map {
+            height: 300px;
+            border-radius: 15px;
+            z-index: 1;
+            margin-bottom: 1rem;
+        }
+        .search-box {
+            backdrop-filter: blur(10px);
+            background: rgba(255, 255, 255, 0.7);
+            padding: 1.5rem;
+            border-radius: 15px;
+            margin-bottom: 2rem;
+        }
+        .forecast-day {
+            text-align: center;
+            padding: 0.5rem;
+        }
+        .current-weather {
+            font-size: 1.2rem;
+        }
+        @media (max-width: 768px) {
+            .weather-card {
+                padding: 1rem;
+            }
+            #map {
+                height: 250px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <!-- Header -->
+        <div class="text-center mb-4">
+            <h1 class="display-5 fw-bold">🌦️ Weather Prediction</h1>
+            <p class="lead">Accurate weather forecasts with interactive maps</p>
+        </div>
+
+        <!-- Search Box -->
+        <div class="row justify-content-center">
+            <div class="col-md-8 search-box">
+                <form id="weatherForm" class="row g-2">
+                    <div class="col-md-9">
+                        <input type="text" class="form-control form-control-lg" id="cityInput" 
+                               placeholder="Enter city (e.g., Delhi, Guwahati)" required>
+                    </div>
+                    <div class="col-md-3">
+                        <button type="submit" class="btn btn-primary btn-lg w-100">
+                            <i class="bi bi-search"></i> Search
+                        </button>
+                    </div>
+                </form>
+                <div class="text-center mt-2">
+                    <small class="text-muted">Showing data for: <span id="searchedCity">-</span></small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results" style="display: none;">
+            <!-- Current Weather -->
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="weather-card">
+                        <h3 class="d-flex justify-content-between align-items-center">
+                            <span id="currentCity">Current Weather</span>
+                            <small id="responseTime" class="text-muted"></small>
+                        </h3>
+                        <div class="row align-items-center">
+                            <div class="col-6 current-weather">
+                                <h2 id="currentTemp" class="display-4 mb-0">--°C</h2>
+                                <p id="currentDesc" class="lead">--</p>
+                                <p><i class="bi bi-droplet"></i> Humidity: <span id="humidity">--%</span></p>
+                                <p><i class="bi bi-wind"></i> Wind: <span id="wind">-- km/h</span></p>
+                            </div>
+                            <div class="col-6 text-center">
+                                <img id="weatherIcon" src="" alt="Weather icon" style="width: 120px;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Map -->
+                <div class="col-md-6">
+                    <div class="weather-card p-0 overflow-hidden">
+                        <div id="map"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5-Day Forecast -->
+            <div class="weather-card mt-3">
+                <h4 class="mb-3"><i class="bi bi-calendar3"></i> 5-Day Forecast</h4>
+                <div class="row text-center" id="forecastContainer"></div>
+            </div>
+        </div>
+
+        <!-- How It Works -->
+        <div class="weather-card mt-4" id="instructions">
+            <h3><i class="bi bi-info-circle"></i> How It Works</h3>
+            <ol>
+                <li>Enter any city name in the search box</li>
+                <li>Get real-time weather data from OpenWeatherMap API</li>
+                <li>View interactive map and detailed 5-day forecast</li>
+                <li>Check API response time metrics</li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- JavaScript Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        let map;
+        document.getElementById('weatherForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const city = document.getElementById('cityInput').value;
+            document.getElementById('searchedCity').textContent = city;
+            
+            try {
+                const response = await fetch('/get_weather', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: `city=${encodeURIComponent(city)}`
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    alert(data.error);
+                    return;
+                }
+                
+                // Show results
+                document.getElementById('instructions').style.display = 'none';
+                document.getElementById('results').style.display = 'block';
+                
+                // Update current weather
+                document.getElementById('currentCity').textContent = `${data.city} - ${formatDate(data.current.time)}`;
+                document.getElementById('currentTemp').textContent = `${Math.round(data.current.temp)}°C`;
+                document.getElementById('currentDesc').textContent = data.current.description;
+                document.getElementById('weatherIcon').src = `https://openweathermap.org/img/wn/${data.current.icon}@2x.png`;
+                document.getElementById('humidity').textContent = `${data.current.humidity}%`;
+                document.getElementById('wind').textContent = `${Math.round(data.current.wind * 3.6)} km/h`;
+                document.getElementById('responseTime').textContent = `Fetched in ${data.response_time}ms`;
+                
+                // Initialize/update map
+                if (!map) {
+                    map = L.map('map').setView([data.coords.lat, data.coords.lon], 11);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+                } else {
+                    map.setView([data.coords.lat, data.coords.lon], 11);
+                }
+                
+                // Clear existing markers
+                map.eachLayer(layer => {
+                    if (layer instanceof L.Marker) {
+                        map.removeLayer(layer);
+                    }
+                });
+                
+                L.marker([data.coords.lat, data.coords.lon])
+                    .addTo(map)
+                    .bindPopup(data.city)
+                    .openPopup();
+                
+                // Update forecast
+                const forecastContainer = document.getElementById('forecastContainer');
+                forecastContainer.innerHTML = '';
+                
+                data.forecast.forEach(day => {
+                    forecastContainer.innerHTML += `
+                        <div class="col forecast-day">
+                            <h5>${formatDay(day.date)}</h5>
+                            <img src="https://openweathermap.org/img/wn/${day.icon}.png" alt="${day.description}">
+                            <h4>${Math.round(day.temp)}°C</h4>
+                            <small class="text-muted">${day.description}</small>
+                        </div>
+                    `;
+                });
+                
+            } catch (err) {
+                console.error(err);
+                alert('Failed to fetch weather data');
+            }
+        });
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                month: 'short', 
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        function formatDay(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('en-US', { weekday: 'short' });
+        }
+    </script>
+</body>
+</html>
