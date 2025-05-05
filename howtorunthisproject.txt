@@ -1,0 +1,12 @@
+mobile
+Windows: Open Command Prompt → Run ipconfig → Look for IPv4 Address (e.g., 192.168.1.100).
+flask run --host=0.0.0.0 --port=5000
+chrome mobile http://192.168.1.100:5000
+
+windows:
+change directory: E:
+cd PROJECT8thsem\weather_app (according to where you have kept this project folder)
+in the Command Prompt or Windows PowerShell type-  python app.py
+where you'll get an output showing you- Running on http://127.0.0.1:5000
+ * Running on http://172.20.10.3:5000
+in any browser you can search for this project using - http://localhost:5000/
